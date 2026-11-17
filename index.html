@@ -75,8 +75,10 @@ let backgroundOffset=0;
 let lastTime=0;
 let nextColumnX=0;
 let flash=0;
-let cellSize=60;
-let rowCount=8;
+
+const BLOCK_SIZE=120;
+const BLOCK_GAP=45;
+const COLUMN_SPACING=245;
 
 best=Number(localStorage.getItem("floppy2048_best")||0);
 plays=Number(localStorage.getItem("floppy2048_plays")||0);
@@ -91,16 +93,14 @@ function resize(){
  canvas.width=Math.floor(W*dpr);
  canvas.height=Math.floor(H*dpr);
  ctx.setTransform(dpr,0,0,dpr,0,0);
- cellSize=Math.max(44,Math.min(65,H/9));
- rowCount=Math.max(6,Math.floor((H-50)/cellSize));
 }
 new ResizeObserver(resize).observe(wrap);
 resize();
 
-function rowY(row){
- const total=rowCount*cellSize;
+function rowY(row,amount){
+ const total=amount*BLOCK_SIZE+(amount-1)*BLOCK_GAP;
  const top=(H-total)/2;
- return top+row*cellSize+cellSize/2;
+ return top+row*(BLOCK_SIZE+BLOCK_GAP)+BLOCK_SIZE/2;
 }
 
 function reset(){
@@ -116,40 +116,29 @@ function reset(){
  scoreEl.textContent=0;
  numberEl.textContent=2;
 
- const spacing=Math.max(190,W*.42);
  nextColumnX=W+100;
-
- for(let i=0;i<6;i++){
+ for(let i=0;i<7;i++){
   makeColumn(nextColumnX);
-  nextColumnX+=spacing;
+  nextColumnX+=COLUMN_SPACING;
  }
 }
 
 function makeColumn(x){
- const size=cellSize*.120;
-
- // ブロック間の隙間を大きくする
- const gap=cellSize*.85;
- const step=size+gap;
-
  // 2～4個のブロックを縦に配置
  const amount=2+Math.floor(Math.random()*3);
- const maxStart=Math.max(0,rowCount-amount);
- const start=Math.floor(Math.random()*(maxStart+1));
+ const matchIndex=Math.floor(Math.random()*amount);
 
- const rows=[];
- for(let i=0;i<amount;i++)rows.push(start+i);
+ // 画面内に収まる配置にする
+ const total=amount*BLOCK_SIZE+(amount-1)*BLOCK_GAP;
+ const top=Math.max(8,(H-total)/2);
 
- // 必ず1つだけ現在の数字と同じブロックを配置
- const matchIndex=Math.floor(Math.random()*rows.length);
-
- for(let i=0;i<rows.length;i++){
+ for(let i=0;i<amount;i++){
   let value;
 
   if(i===matchIndex){
    value=player.value;
   }else{
-   // 現在の数字から最大4ランク上まで
+   // 現在の数字から最大4ランク上
    const choices=[
     player.value*2,
     player.value*4,
@@ -159,13 +148,11 @@ function makeColumn(x){
    value=choices[Math.floor(Math.random()*choices.length)];
   }
 
-  const y=rowY(rows[i])-size/2;
-
   blocks.push({
    x:x,
-   y:y,
-   w:size,
-   h:size,
+   y:top+i*(BLOCK_SIZE+BLOCK_GAP),
+   w:BLOCK_SIZE,
+   h:BLOCK_SIZE,
    value:value,
    done:false
   });
@@ -267,15 +254,15 @@ function drawBlock(b){
  ctx.save();
  ctx.shadowColor=c;
  ctx.shadowBlur=13;
- rounded(b.x,b.y,b.w,b.h,10);
+ rounded(b.x,b.y,b.w,b.h,12);
  ctx.fillStyle=c;
  ctx.fill();
  ctx.shadowBlur=0;
- rounded(b.x+3,b.y+3,b.w-6,b.h-6,8);
+ rounded(b.x+4,b.y+4,b.w-8,b.h-8,10);
  ctx.fillStyle="#ffffff22";
  ctx.fill();
  ctx.fillStyle="#172039";
- ctx.font="900 "+Math.max(12,b.w*(String(b.value).length>3?.25:.36))+"px system-ui";
+ ctx.font="900 "+Math.max(18,b.w*(String(b.value).length>5?.20:.30))+"px system-ui";
  ctx.textAlign="center";
  ctx.textBaseline="middle";
  ctx.fillText(b.value,b.x+b.w/2,b.y+b.h/2);
@@ -306,14 +293,12 @@ function drawPlayer(){
 
 function update(dt){
  frame+=dt;
-
- // 少しずつ加速
  speed=Math.min(6.5,3+frame*0.0008+score*0.008);
 
  player.vy+=.27*dt;
  player.y+=player.vy*dt;
 
- // 上下の端を通り抜ける
+ // 上下の端から反対側へ
  if(player.y+player.r<0){
   player.y=H+player.r;
  }else if(player.y-player.r>H){
@@ -348,15 +333,13 @@ function update(dt){
   }
  }
 
- blocks=blocks.filter(b=>b.x+b.w>-50);
+ blocks=blocks.filter(b=>b.x+b.w>-150);
 
- // 列の位置を移動させ、右端に途切れず追加
- const spacing=Math.max(190,W*.42);
+ // 次の列を常に右側へ追加
  nextColumnX-=speed*dt;
-
- while(nextColumnX<W+spacing){
+ while(nextColumnX<W+200){
   makeColumn(nextColumnX);
-  nextColumnX+=spacing;
+  nextColumnX+=COLUMN_SPACING;
  }
 
  for(const p of particles){
