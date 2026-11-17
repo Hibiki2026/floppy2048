@@ -45,7 +45,7 @@ button:active{transform:scale(.96)}
  <div id="overlay">
   <div class="panel">
    <h1 id="overTitle">Floppy2048</h1>
-   <p id="overText">タップ・Enter・スペースキーで上昇！<br>同じ数字のブロックに当たると数字が2倍！<br>違う数字に当たるとゲームオーバー！</p>
+   <p id="overText">タップ・Enter・スペースキーで上昇！<br>同じ数字のブロックに当たると数字が2倍！<br>違う数字に当たるとゲームオーバー！<br>画面の上下は通り抜けられるよ！</p>
    <button id="startBtn">ゲームスタート</button>
   </div>
  </div>
@@ -113,7 +113,6 @@ function reset(){
  player={x:W*.22,y:H*.5,vy:0,value:2,r:22};
  blocks=[];
  particles=[];
-
  scoreEl.textContent=0;
  numberEl.textContent=2;
 
@@ -127,20 +126,19 @@ function reset(){
 }
 
 function makeColumn(x){
- const size=cellSize*.76;
- const gap=cellSize*.13;
+ const size=cellSize*.72;
+ const gap=cellSize*.32;
  const step=size+gap;
 
- const amount=2+Math.floor(Math.random()*4);
+ // 連続するブロックの列
+ const amount=2+Math.floor(Math.random()*3);
  const maxStart=Math.max(0,rowCount-amount);
  const start=Math.floor(Math.random()*(maxStart+1));
 
  const rows=[];
- for(let i=0;i<amount;i++){
-  rows.push(start+i);
- }
+ for(let i=0;i<amount;i++)rows.push(start+i);
 
- // 列の中のどこか一つを同じ数字にする
+ // プレイヤーが通るための大きな空間を必ず作る
  const matchIndex=Math.floor(Math.random()*rows.length);
 
  for(let i=0;i<rows.length;i++){
@@ -151,20 +149,14 @@ function makeColumn(x){
   }else{
    const choices=[2,4,8,16,32,64,128,256,512,1024];
    value=choices[Math.floor(Math.random()*choices.length)];
-   if(value===player.value){
-    value=value===1024?512:value*2;
-   }
+   if(value===player.value)value=value===1024?512:value*2;
   }
 
   const y=rowY(rows[i])-step/2+gap/2;
 
   blocks.push({
-   x:x,
-   y:y,
-   w:size,
-   h:size,
-   value:value,
-   done:false
+   x:x,y:y,w:size,h:size,
+   value:value,done:false
   });
  }
 }
@@ -184,11 +176,9 @@ function burst(x,y,color,n=12){
   const a=Math.random()*Math.PI*2;
   const s=1+Math.random()*4;
   particles.push({
-   x,y,
-   vx:Math.cos(a)*s,
+   x,y,vx:Math.cos(a)*s,
    vy:Math.sin(a)*s,
-   life:35+Math.random()*15,
-   color
+   life:35+Math.random()*15,color
   });
  }
 }
@@ -265,16 +255,13 @@ function drawBlock(b){
  ctx.save();
  ctx.shadowColor=c;
  ctx.shadowBlur=13;
-
  rounded(b.x,b.y,b.w,b.h,10);
  ctx.fillStyle=c;
  ctx.fill();
-
  ctx.shadowBlur=0;
  rounded(b.x+3,b.y+3,b.w-6,b.h-6,8);
  ctx.fillStyle="#ffffff22";
  ctx.fill();
-
  ctx.fillStyle="#172039";
  ctx.font="900 "+Math.max(12,b.w*(String(b.value).length>3?.25:.36))+"px system-ui";
  ctx.textAlign="center";
@@ -284,23 +271,19 @@ function drawBlock(b){
 }
 
 function drawPlayer(){
- const p=player;
- const c=colorFor(p.value);
+ const p=player,c=colorFor(p.value);
  ctx.save();
  ctx.shadowColor=c;
  ctx.shadowBlur=25;
-
  ctx.beginPath();
  ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
  ctx.fillStyle=c;
  ctx.fill();
-
  ctx.shadowBlur=0;
  ctx.beginPath();
  ctx.arc(p.x-6,p.y-7,p.r*.62,0,Math.PI*2);
  ctx.fillStyle="#ffffff35";
  ctx.fill();
-
  ctx.fillStyle="#172039";
  ctx.font="900 "+(String(p.value).length>3?10:13)+"px system-ui";
  ctx.textAlign="center";
@@ -312,15 +295,17 @@ function drawPlayer(){
 function update(dt){
  frame+=dt;
 
- // 時間経過で少しずつ加速。最大速度で止まる
+ // 少しずつ加速
  speed=Math.min(6.5,3+frame*0.0008+score*0.008);
 
  player.vy+=.27*dt;
  player.y+=player.vy*dt;
 
- if(player.y<=player.r||player.y>=H-player.r){
-  gameOver();
-  return;
+ // 上から出たら下から、下から出たら上から
+ if(player.y+player.r<0){
+  player.y=H+player.r;
+ }else if(player.y-player.r>H){
+  player.y=-player.r;
  }
 
  if(flash>0)flash-=dt;
@@ -353,7 +338,6 @@ function update(dt){
 
  blocks=blocks.filter(b=>b.x+b.w>-50);
 
- // 一定間隔で列を一つずつ追加
  const spacing=Math.max(165,W*.36);
  if(nextColumnX<W+spacing){
   makeColumn(nextColumnX);
@@ -371,11 +355,7 @@ function update(dt){
 
 function draw(){
  drawBackground(1);
-
- for(const b of blocks){
-  if(!b.done)drawBlock(b);
- }
-
+ for(const b of blocks)if(!b.done)drawBlock(b);
  drawPlayer();
 
  for(const p of particles){
@@ -397,10 +377,8 @@ function loop(now){
  if(!running)return;
  const dt=Math.min(2,(now-lastTime)/16.67);
  lastTime=now;
-
  update(dt);
  draw();
-
  if(running)requestAnimationFrame(loop);
 }
 
