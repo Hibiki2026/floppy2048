@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Floppy2048</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101326;color:white;font-family:system-ui,sans-serif;overflow:hidden;touch-action:none}
+#app{height:100dvh;display:flex;flex-direction:column;align-items:center;padding:10px}
+header{width:min(100%,650px);display:flex;justify-content:space-between;align-items:center;padding:5px 3px 12px;gap:5px}
+.logo{font-size:23px;font-weight:900}
+.logo span{color:#8b83ff}
+.stats{display:flex;gap:5px}
+.stat{background:#222744;border:1px solid #343c62;border-radius:11px;padding:6px 9px;text-align:center;min-width:65px}
+.stat small{display:block;color:#9da8ce;font-size:9px}
+.stat b{font-size:16px}
+#gameWrap{position:relative;width:min(100%,650px);flex:1;min-height:0;max-height:850px;border:2px solid #333c64;border-radius:20px;overflow:hidden;background:#171d39}
+canvas{width:100%;height:100%;display:block}
+#overlay{position:absolute;inset:0;background:#101326d9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+.panel{max-width:360px}
+.panel h1{font-size:38px;margin:0 0 8px}
+.panel p{color:#c2c9e8;line-height:1.7;font-size:14px}
+button{border:0;border-radius:14px;padding:14px 28px;background:linear-gradient(135deg,#8b83ff,#5b6cff);color:white;font-weight:900;font-size:17px;cursor:pointer}
+button:active{transform:scale(.96)}
+#hint{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#aeb7d8;font-size:12px;pointer-events:none}
+#mobileTip{width:min(100%,650px);text-align:center;color:#9da8ce;font-size:12px;padding:9px}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+ <div class="logo">FLOPPY<span>2048</span></div>
+ <div class="stats">
+  <div class="stat"><small>スコア</small><b id="score">0</b></div>
+  <div class="stat"><small>現在の数字</small><b id="number">2</b></div>
+  <div class="stat"><small>自己ベスト</small><b id="best">0</b></div>
+  <div class="stat"><small>総プレイ回数</small><b id="plays">0</b></div>
+ </div>
+</header>
+<div id="gameWrap">
+ <canvas id="game"></canvas>
+ <div id="overlay">
+  <div class="panel">
+   <h1 id="overTitle">Floppy2048</h1>
+   <p id="overText">タップ・Enter・スペースキーで上昇！<br>同じ数字のブロックを通過すると数字が2倍になるよ。<br>違う数字に当たるとゲームオーバー！</p>
+   <button id="startBtn">ゲームスタート</button>
+  </div>
+ </div>
+ <div id="hint">タップ / ENTER / SPACE で上昇</div>
+</div>
+<div id="mobileTip">画面タップでも操作できるよ！</div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const wrap=document.getElementById("gameWrap");
+const overlay=document.getElementById("overlay");
+const startBtn=document.getElementById("startBtn");
+const scoreEl=document.getElementById("score");
+const numberEl=document.getElementById("number");
+const bestEl=document.getElementById("best");
+const playsEl=document.getElementById("plays");
+
+let W=600,H=700;
+let running=false,started=false;
+let player,blocks,particles,score,best,plays,speed,frame,backgroundOffset,flash,lastTime;
+
+best=Number(localStorage.getItem("floppy2048_best")||0);
+plays=Number(localStorage.getItem("floppy2048_plays")||0);
+bestEl.textContent=best;
+playsEl.textContent=plays;
+
+function resize(){
+ const r=wrap.getBoundingClientRect();
+ const dpr=Math.min(devicePixelRatio||1,2);
+ W=r.width;H=r.height;
+ canvas.width=Math.floor(W*dpr);
+ canvas.height=Math.floor(H*dpr);
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+new ResizeObserver(resize).observe(wrap);
+resize();
+
+function reset(){
+ score=0;speed=3.2;frame=0;backgroundOffset=0;flash=0;
+ player={x:W*.22,y:H*.48,vy:0,value:2,r:23};
+ blocks=[];particles=[];
+ scoreEl.textContent=0;
+ numberEl.textContent=2;
+ for(let i=0;i<5;i++)makeColumn(W+180+i*190);
+}
+
+function makeColumn(x){
+ const cell=Math.max(48,Math.min(66,H*.09));
+ const count=2+Math.floor(Math.random()*3);
+ const used=[];
+ const matchIndex=Math.random()<.68?Math.floor(Math.random()*count):-1;
+
+ for(let i=0;i<count;i++){
+  let y,tries=0;
+  do{
+   y=65+Math.random()*(H-130-cell);
+   tries++;
+  }while(used.some(v=>Math.abs(v-y)<cell*1.05)&&tries<30);
+  used.push(y);
+
+  let value;
+  if(i===matchIndex)value=player.value;
+  else{
+   const choices=[2,4,8,16,32,64,128,256,512,1024];
+   value=choices[Math.floor(Math.random()*choices.length)];
+   if(value===player.value)value*=2;
+  }
+  blocks.push({x,y,w:cell,h:cell,value,done:false});
+ }
+}
+
+function flap(){
+ if(!running)return;
+ player.vy=-6.3;
+ burst(player.x,player.y,"#a9a2ff",5);
+}
+
+function start(){
+ reset();
+ plays++;
+ localStorage.setItem("floppy2048_plays",plays);
+ playsEl.textContent=plays;
+
+ running=true;started=true;
+ overlay.style.display="none";
+ lastTime=performance.now();
+ requestAnimationFrame(loop);
+}
+
+function gameOver(){
+ if(!running)return;
+ running=false;
+
+ if(score>best){
+  best=score;
+  localStorage.setItem("floppy2048_best",best);
+  bestEl.textContent=best;
+ }
+
+ document.getElementById("overTitle").textContent="GAME OVER";
+ document.getElementById("overText").innerHTML=
+  "スコア："+score+
+  "<br>到達した数字："+player.value+
+  "<br>自己ベスト："+best+
+  "<br>総プレイ回数："+plays+
+  "<br><br>もう一度挑戦しよう！";
+ startBtn.textContent="もう一度プレイ";
+ overlay.style.display="flex";
+}
+
+function burst(x,y,color,n=12){
+ for(let i=0;i<n;i++){
+  const a=Math.random()*Math.PI*2;
+  const s=1+Math.random()*4;
+  particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:35+Math.random()*15,color});
+ }
+}
+
+function rounded(x,y,w,h,r){
+ ctx.beginPath();ctx.roundRect(x,y,w,h,r);
+}
+
+function colorFor(v){
+ const colors={
+  2:"#6ee7d8",4:"#6caeff",8:"#9b83ff",16:"#c17aff",
+  32:"#ff78b8",64:"#ff8b76",128:"#ffbd65",256:"#e7dc67",
+  512:"#a9dc72",1024:"#61d6a1",2048:"#5ce0e8"
+ };
+ return colors[v]||"#f5a5ff";
+}
+
+function drawBackground(dt){
+ ctx.fillStyle="#171d39";
+ ctx.fillRect(0,0,W,H);
+ backgroundOffset=(backgroundOffset+speed*.25*dt)%55;
+ ctx.strokeStyle="#ffffff0b";
+ ctx.lineWidth=1;
+ for(let x=-55+backgroundOffset;x<W;x+=55){
+  ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();
+ }
+ for(let y=0;y<H;y+=55){
+  ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+ }
+}
+
+function drawBlock(b){
+ const c=colorFor(b.value);
+ ctx.save();
+ ctx.shadowColor=c;ctx.shadowBlur=13;
+ rounded(b.x,b.y,b.w,b.h,12);
+ ctx.fillStyle=c;ctx.fill();
+ ctx.shadowBlur=0;
+ rounded(b.x+3,b.y+3,b.w-6,b.h-6,10);
+ ctx.fillStyle="#ffffff22";ctx.fill();
+ ctx.fillStyle="#172039";
+ ctx.font="900 "+Math.max(13,b.w*(String(b.value).length>3?.25:.36))+"px system-ui";
+ ctx.textAlign="center";ctx.textBaseline="middle";
+ ctx.fillText(b.value,b.x+b.w/2,b.y+b.h/2);
+ ctx.restore();
+}
+
+function drawPlayer(){
+ const p=player,c=colorFor(p.value);
+ ctx.save();
+ ctx.shadowColor=c;ctx.shadowBlur=25;
+ ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ ctx.fillStyle=c;ctx.fill();
+ ctx.shadowBlur=0;
+ ctx.beginPath();ctx.arc(p.x-6,p.y-7,p.r*.62,0,Math.PI*2);
+ ctx.fillStyle="#ffffff35";ctx.fill();
+ ctx.fillStyle="#172039";
+ ctx.font="900 "+(String(p.value).length>3?10:13)+"px system-ui";
+ ctx.textAlign="center";ctx.textBaseline="middle";
+ ctx.fillText(p.value,p.x,p.y);
+ ctx.restore();
+}
+
+function update(dt){
+ frame+=dt;
+ speed=Math.min(5.8,3.2+score*.025);
+ player.vy+=.27*dt;
+ player.y+=player.vy*dt;
+
+ if(player.y<=player.r||player.y>=H-player.r){
+  gameOver();return;
+ }
+
+ if(flash>0)flash-=dt;
+
+ for(const b of blocks){
+  b.x-=speed*dt;
+
+  if(!b.done&&
+   player.x+player.r>b.x&&player.x-player.r<b.x+b.w&&
+   player.y+player.r>b.y&&player.y-player.r<b.y+b.h){
+
+   if(b.value===player.value){
+    b.done=true;
+    player.value*=2;
+    player.r=Math.min(30,23+Math.log2(player.value/2)*.8);
+    score++;
+    numberEl.textContent=player.value;
+    scoreEl.textContent=score;
+    burst(b.x+b.w/2,b.y+b.h/2,"#fff",24);
+    flash=10;
+   }else{
+    burst(player.x,player.y,"#ff617d",20);
+    gameOver();return;
+   }
+  }
+ }
+
+ blocks=blocks.filter(b=>b.x+b.w>-30);
+ if(blocks.length===0||Math.max(...blocks.map(b=>b.x))<W+100){
+  makeColumn(W+100+Math.random()*80);
+ }
+
+ for(const p of particles){
+  p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.08*dt;p.life-=dt;
+ }
+ particles=particles.filter(p=>p.life>0);
+}
+
+function draw(){
+ drawBackground(1);
+ for(const b of blocks)if(!b.done)drawBlock(b);
+ drawPlayer();
+
+ for(const p of particles){
+  ctx.globalAlpha=Math.max(0,p.life/45);
+  ctx.fillStyle=p.color;
+  ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();
+ }
+ ctx.globalAlpha=1;
+
+ if(flash>0){
+  ctx.fillStyle="rgba(255,255,255,"+(flash/70)+")";
+  ctx.fillRect(0,0,W,H);
+ }
+}
+
+function loop(now){
+ if(!running)return;
+ const dt=Math.min(2,(now-lastTime)/16.67);
+ lastTime=now;
+ update(dt);draw();
+ if(running)requestAnimationFrame(loop);
+}
+
+function action(e){
+ if(e)e.preventDefault();
+ if(!running)return;
+ flap();
+}
+
+canvas.addEventListener("pointerdown",action);
+
+document.addEventListener("keydown",e=>{
+ if(e.code==="Enter"||e.code==="Space"||e.code==="ArrowUp"){
+  e.preventDefault();
+  if(!running){
+   if(!started)start();
+   return;
+  }
+  flap();
+ }
+});
+
+startBtn.addEventListener("click",start);
+drawBackground(0);
+</script>
+</body>
+</html>
