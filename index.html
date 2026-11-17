@@ -7,60 +7,25 @@
 <title>Floppy2048</title>
 <style>
 *{box-sizing:border-box}
-body{
- margin:0;background:#101326;color:white;
- font-family:system-ui,sans-serif;overflow:hidden;
- touch-action:none
-}
-#app{
- height:100dvh;display:flex;flex-direction:column;
- align-items:center;padding:10px
-}
-header{
- width:min(100%,650px);display:flex;
- justify-content:space-between;align-items:center;
- padding:5px 3px 12px;gap:5px;flex-wrap:wrap
-}
+body{margin:0;background:#101326;color:white;font-family:system-ui,sans-serif;overflow:hidden;touch-action:none}
+#app{height:100dvh;display:flex;flex-direction:column;align-items:center;padding:10px}
+header{width:min(100%,650px);display:flex;justify-content:space-between;align-items:center;padding:5px 3px 12px;gap:5px;flex-wrap:wrap}
 .logo{font-size:23px;font-weight:900}
 .logo span{color:#8b83ff}
 .stats{display:flex;gap:5px;flex-wrap:wrap}
-.stat{
- background:#222744;border:1px solid #343c62;
- border-radius:11px;padding:6px 9px;
- text-align:center;min-width:65px
-}
+.stat{background:#222744;border:1px solid #343c62;border-radius:11px;padding:6px 9px;text-align:center;min-width:65px}
 .stat small{display:block;color:#9da8ce;font-size:9px}
 .stat b{font-size:16px}
-#gameWrap{
- position:relative;width:min(100%,650px);
- flex:1;min-height:0;max-height:850px;
- border:2px solid #333c64;border-radius:20px;
- overflow:hidden;background:#171d39
-}
+#gameWrap{position:relative;width:min(100%,650px);flex:1;min-height:0;max-height:850px;border:2px solid #333c64;border-radius:20px;overflow:hidden;background:#171d39}
 canvas{width:100%;height:100%;display:block}
-#overlay{
- position:absolute;inset:0;background:#101326d9;
- display:flex;align-items:center;justify-content:center;
- text-align:center;padding:20px
-}
+#overlay{position:absolute;inset:0;background:#101326d9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
 .panel{max-width:360px}
 .panel h1{font-size:38px;margin:0 0 8px}
 .panel p{color:#c2c9e8;line-height:1.7;font-size:14px}
-button{
- border:0;border-radius:14px;padding:14px 28px;
- background:linear-gradient(135deg,#8b83ff,#5b6cff);
- color:white;font-weight:900;font-size:17px;cursor:pointer
-}
+button{border:0;border-radius:14px;padding:14px 28px;background:linear-gradient(135deg,#8b83ff,#5b6cff);color:white;font-weight:900;font-size:17px;cursor:pointer}
 button:active{transform:scale(.96)}
-#hint{
- position:absolute;bottom:12px;left:0;right:0;
- text-align:center;color:#aeb7d8;font-size:12px;
- pointer-events:none
-}
-#mobileTip{
- width:min(100%,650px);text-align:center;
- color:#9da8ce;font-size:12px;padding:9px
-}
+#hint{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#aeb7d8;font-size:12px;pointer-events:none}
+#mobileTip{width:min(100%,650px);text-align:center;color:#9da8ce;font-size:12px;padding:9px}
 </style>
 </head>
 <body>
@@ -80,11 +45,7 @@ button:active{transform:scale(.96)}
  <div id="overlay">
   <div class="panel">
    <h1 id="overTitle">Floppy2048</h1>
-   <p id="overText">
-    タップ・Enter・スペースキーで上昇！<br>
-    同じ数字のブロックに当たると数字が2倍！<br>
-    違う数字に当たるとゲームオーバー！
-   </p>
+   <p id="overText">タップ・Enter・スペースキーで上昇！<br>同じ数字のブロックに当たると数字が2倍！<br>違う数字に当たるとゲームオーバー！</p>
    <button id="startBtn">ゲームスタート</button>
   </div>
  </div>
@@ -109,7 +70,7 @@ let W=600,H=700,dpr=1;
 let running=false,started=false;
 let player,blocks,particles;
 let score=0,best=0,plays=0;
-let speed=3.2,frame=0;
+let speed=3,frame=0;
 let backgroundOffset=0;
 let lastTime=0;
 let nextColumnX=0;
@@ -119,7 +80,6 @@ let rowCount=8;
 
 best=Number(localStorage.getItem("floppy2048_best")||0);
 plays=Number(localStorage.getItem("floppy2048_plays")||0);
-
 bestEl.textContent=best;
 playsEl.textContent=plays;
 
@@ -128,15 +88,12 @@ function resize(){
  dpr=Math.min(window.devicePixelRatio||1,2);
  W=Math.max(1,r.width);
  H=Math.max(1,r.height);
-
  canvas.width=Math.floor(W*dpr);
  canvas.height=Math.floor(H*dpr);
  ctx.setTransform(dpr,0,0,dpr,0,0);
-
  cellSize=Math.max(44,Math.min(65,H/9));
  rowCount=Math.max(6,Math.floor((H-50)/cellSize));
 }
-
 new ResizeObserver(resize).observe(wrap);
 resize();
 
@@ -148,28 +105,20 @@ function rowY(row){
 
 function reset(){
  score=0;
- speed=3.2;
+ speed=3;
  frame=0;
  backgroundOffset=0;
  flash=0;
 
- player={
-  x:W*.22,
-  y:H*.5,
-  vy:0,
-  value:2,
-  r:22
- };
-
+ player={x:W*.22,y:H*.5,vy:0,value:2,r:22};
  blocks=[];
  particles=[];
 
  scoreEl.textContent=0;
  numberEl.textContent=2;
 
- // 最初から一定間隔で列を並べる
- const spacing=Math.max(145,W*.34);
- nextColumnX=W+80;
+ const spacing=Math.max(165,W*.36);
+ nextColumnX=W+100;
 
  for(let i=0;i<5;i++){
   makeColumn(W+100+i*spacing);
@@ -177,50 +126,41 @@ function reset(){
  nextColumnX=W+100+5*spacing;
 }
 
-// マス目に沿って縦一列ずつ生成
 function makeColumn(x){
- const occupied=new Set();
- const available=[];
+ const size=cellSize*.76;
+ const gap=cellSize*.13;
+ const step=size+gap;
 
- for(let i=0;i<rowCount;i++)available.push(i);
+ const amount=2+Math.floor(Math.random()*4);
+ const maxStart=Math.max(0,rowCount-amount);
+ const start=Math.floor(Math.random()*(maxStart+1));
 
- // この列に置くブロック数
- const amount=Math.min(
-  rowCount-2,
-  2+Math.floor(Math.random()*3)
- );
-
- // ブロックを置く行をランダム選択
+ const rows=[];
  for(let i=0;i<amount;i++){
-  const index=Math.floor(Math.random()*available.length);
-  occupied.add(available.splice(index,1)[0]);
+  rows.push(start+i);
  }
 
- // 必ず同じ数字のブロックを一つ配置
- const matchRow=Math.floor(Math.random()*rowCount);
- occupied.add(matchRow);
+ // 列の中のどこか一つを同じ数字にする
+ const matchIndex=Math.floor(Math.random()*rows.length);
 
- const rows=[...occupied].sort((a,b)=>a-b);
-
- for(const row of rows){
+ for(let i=0;i<rows.length;i++){
   let value;
 
-  if(row===matchRow){
+  if(i===matchIndex){
    value=player.value;
   }else{
    const choices=[2,4,8,16,32,64,128,256,512,1024];
    value=choices[Math.floor(Math.random()*choices.length)];
-
    if(value===player.value){
     value=value===1024?512:value*2;
    }
   }
 
-  const size=cellSize*.76;
+  const y=rowY(rows[i])-step/2+gap/2;
 
   blocks.push({
    x:x,
-   y:rowY(row)-size/2,
+   y:y,
    w:size,
    h:size,
    value:value,
@@ -231,17 +171,10 @@ function makeColumn(x){
 
 function colorFor(v){
  const colors={
-  2:"#6ee7d8",
-  4:"#6caeff",
-  8:"#9b83ff",
-  16:"#c17aff",
-  32:"#ff78b8",
-  64:"#ff8b76",
-  128:"#ffbd65",
-  256:"#e7dc67",
-  512:"#a9dc72",
-  1024:"#61d6a1",
-  2048:"#5ce0e8"
+  2:"#6ee7d8",4:"#6caeff",8:"#9b83ff",
+  16:"#c17aff",32:"#ff78b8",64:"#ff8b76",
+  128:"#ffbd65",256:"#e7dc67",512:"#a9dc72",
+  1024:"#61d6a1",2048:"#5ce0e8"
  };
  return colors[v]||"#f5a5ff";
 }
@@ -250,7 +183,6 @@ function burst(x,y,color,n=12){
  for(let i=0;i<n;i++){
   const a=Math.random()*Math.PI*2;
   const s=1+Math.random()*4;
-
   particles.push({
    x,y,
    vx:Math.cos(a)*s,
@@ -263,29 +195,24 @@ function burst(x,y,color,n=12){
 
 function flap(){
  if(!running)return;
-
  player.vy=-6.3;
  burst(player.x,player.y,"#a9a2ff",5);
 }
 
 function start(){
  reset();
-
  plays++;
  localStorage.setItem("floppy2048_plays",plays);
  playsEl.textContent=plays;
-
  running=true;
  started=true;
  overlay.style.display="none";
-
  lastTime=performance.now();
  requestAnimationFrame(loop);
 }
 
 function gameOver(){
  if(!running)return;
-
  running=false;
 
  if(score>best){
@@ -295,7 +222,6 @@ function gameOver(){
  }
 
  document.getElementById("overTitle").textContent="GAME OVER";
-
  document.getElementById("overText").innerHTML=
   "スコア："+score+
   "<br>到達した数字："+player.value+
@@ -317,7 +243,6 @@ function drawBackground(dt){
  ctx.fillRect(0,0,W,H);
 
  backgroundOffset=(backgroundOffset+speed*.25*dt)%55;
-
  ctx.strokeStyle="#ffffff0b";
  ctx.lineWidth=1;
 
@@ -327,7 +252,6 @@ function drawBackground(dt){
   ctx.lineTo(x,H);
   ctx.stroke();
  }
-
  for(let y=0;y<H;y+=55){
   ctx.beginPath();
   ctx.moveTo(0,y);
@@ -338,7 +262,6 @@ function drawBackground(dt){
 
 function drawBlock(b){
  const c=colorFor(b.value);
-
  ctx.save();
  ctx.shadowColor=c;
  ctx.shadowBlur=13;
@@ -348,27 +271,21 @@ function drawBlock(b){
  ctx.fill();
 
  ctx.shadowBlur=0;
-
  rounded(b.x+3,b.y+3,b.w-6,b.h-6,8);
  ctx.fillStyle="#ffffff22";
  ctx.fill();
 
  ctx.fillStyle="#172039";
- ctx.font="900 "+Math.max(
-  12,b.w*(String(b.value).length>3?.25:.36)
- )+"px system-ui";
-
+ ctx.font="900 "+Math.max(12,b.w*(String(b.value).length>3?.25:.36))+"px system-ui";
  ctx.textAlign="center";
  ctx.textBaseline="middle";
  ctx.fillText(b.value,b.x+b.w/2,b.y+b.h/2);
-
  ctx.restore();
 }
 
 function drawPlayer(){
  const p=player;
  const c=colorFor(p.value);
-
  ctx.save();
  ctx.shadowColor=c;
  ctx.shadowBlur=25;
@@ -379,7 +296,6 @@ function drawPlayer(){
  ctx.fill();
 
  ctx.shadowBlur=0;
-
  ctx.beginPath();
  ctx.arc(p.x-6,p.y-7,p.r*.62,0,Math.PI*2);
  ctx.fillStyle="#ffffff35";
@@ -390,14 +306,14 @@ function drawPlayer(){
  ctx.textAlign="center";
  ctx.textBaseline="middle";
  ctx.fillText(p.value,p.x,p.y);
-
  ctx.restore();
 }
 
 function update(dt){
  frame+=dt;
 
- speed=Math.min(5.5,3.2+score*.025);
+ // 時間経過で少しずつ加速。最大速度で止まる
+ speed=Math.min(6.5,3+frame*0.0008+score*0.008);
 
  player.vy+=.27*dt;
  player.y+=player.vy*dt;
@@ -409,7 +325,6 @@ function update(dt){
 
  if(flash>0)flash-=dt;
 
- // ブロックを移動・衝突判定
  for(const b of blocks){
   b.x-=speed*dt;
 
@@ -421,23 +336,12 @@ function update(dt){
 
    if(b.value===player.value){
     b.done=true;
-
     player.value*=2;
-    player.r=Math.min(
-     30,22+Math.log2(player.value/2)*.8
-    );
-
+    player.r=Math.min(30,22+Math.log2(player.value/2)*.8);
     score++;
     numberEl.textContent=player.value;
     scoreEl.textContent=score;
-
-    burst(
-     b.x+b.w/2,
-     b.y+b.h/2,
-     "#ffffff",
-     24
-    );
-
+    burst(b.x+b.w/2,b.y+b.h/2,"#ffffff",24);
     flash=10;
    }else{
     burst(player.x,player.y,"#ff617d",20);
@@ -447,32 +351,27 @@ function update(dt){
   }
  }
 
- // 画面外のブロックを削除
  blocks=blocks.filter(b=>b.x+b.w>-50);
 
- // 一定間隔で新しい列を一つだけ追加
- const spacing=Math.max(145,W*.34);
-
+ // 一定間隔で列を一つずつ追加
+ const spacing=Math.max(165,W*.36);
  if(nextColumnX<W+spacing){
   makeColumn(nextColumnX);
   nextColumnX+=spacing;
  }
 
- // パーティクル
  for(const p of particles){
   p.x+=p.vx*dt;
   p.y+=p.vy*dt;
   p.vy+=.08*dt;
   p.life-=dt;
  }
-
  particles=particles.filter(p=>p.life>0);
 }
 
 function draw(){
  drawBackground(1);
 
- // 列ごとに整列したブロック
  for(const b of blocks){
   if(!b.done)drawBlock(b);
  }
@@ -486,7 +385,6 @@ function draw(){
   ctx.arc(p.x,p.y,3,0,Math.PI*2);
   ctx.fill();
  }
-
  ctx.globalAlpha=1;
 
  if(flash>0){
@@ -497,45 +395,32 @@ function draw(){
 
 function loop(now){
  if(!running)return;
-
  const dt=Math.min(2,(now-lastTime)/16.67);
  lastTime=now;
 
  update(dt);
  draw();
 
- if(running){
-  requestAnimationFrame(loop);
- }
+ if(running)requestAnimationFrame(loop);
 }
 
-function action(e){
- if(e)e.preventDefault();
- if(running)flap();
-}
-
-canvas.addEventListener("pointerdown",action);
+canvas.addEventListener("pointerdown",e=>{
+ e.preventDefault();
+ flap();
+});
 
 document.addEventListener("keydown",e=>{
- if(
-  e.code==="Enter"||
-  e.code==="Space"||
-  e.code==="ArrowUp"
- ){
+ if(e.code==="Enter"||e.code==="Space"||e.code==="ArrowUp"){
   e.preventDefault();
-
   if(!running){
-   if(!started)start();
-   else start();
+   start();
    return;
   }
-
   flap();
  }
 });
 
 startBtn.addEventListener("click",start);
-
 drawBackground(0);
 </script>
 </body>
