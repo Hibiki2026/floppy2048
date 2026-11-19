@@ -76,8 +76,9 @@ let lastTime=0;
 let nextColumnX=0;
 let flash=0;
 
-const BLOCK_SIZE=90;
-const BLOCK_GAP=20;
+// 79～81行目：指定された設定
+const BLOCK_SIZE=80;
+const BLOCK_GAP=35;
 const COLUMN_SPACING=400;
 
 best=Number(localStorage.getItem("floppy2048_best")||0);
@@ -96,12 +97,6 @@ function resize(){
 }
 new ResizeObserver(resize).observe(wrap);
 resize();
-
-function rowY(row,amount){
- const total=amount*BLOCK_SIZE+(amount-1)*BLOCK_GAP;
- const top=(H-total)/2;
- return top+row*(BLOCK_SIZE+BLOCK_GAP)+BLOCK_SIZE/2;
-}
 
 function reset(){
  score=0;
@@ -124,13 +119,26 @@ function reset(){
 }
 
 function makeColumn(x){
- // 2～4個のブロックを縦に配置
- const amount=2+Math.floor(Math.random()*3);
- const matchIndex=Math.floor(Math.random()*amount);
+ // 最大5個のブロックを配置。6個目のスペースも確保する
+ const amount=2+Math.floor(Math.random()*4);
 
- // 画面内に収まる配置にする
- const total=amount*BLOCK_SIZE+(amount-1)*BLOCK_GAP;
+ // 6個分の配置スペースを計算
+ const slotCount=6;
+ const availableGap=Math.min(
+  BLOCK_GAP,
+  Math.max(4,(H-16-slotCount*BLOCK_SIZE)/(slotCount-1))
+ );
+ const total=slotCount*BLOCK_SIZE+(slotCount-1)*availableGap;
  const top=Math.max(8,(H-total)/2);
+
+ // 使う位置をランダムに選ぶ（6段目は空けておく）
+ const positions=[0,1,2,3,4];
+ for(let i=positions.length-1;i>0;i--){
+  const j=Math.floor(Math.random()*(i+1));
+  [positions[i],positions[j]]=[positions[j],positions[i]];
+ }
+ const selected=positions.slice(0,amount).sort((a,b)=>a-b);
+ const matchIndex=Math.floor(Math.random()*amount);
 
  for(let i=0;i<amount;i++){
   let value;
@@ -138,7 +146,6 @@ function makeColumn(x){
   if(i===matchIndex){
    value=player.value;
   }else{
-   // 現在の数字から最大4ランク上
    const choices=[
     player.value*2,
     player.value*4,
@@ -148,9 +155,11 @@ function makeColumn(x){
    value=choices[Math.floor(Math.random()*choices.length)];
   }
 
+  const slot=selected[i];
+
   blocks.push({
    x:x,
-   y:top+i*(BLOCK_SIZE+BLOCK_GAP),
+   y:top+slot*(BLOCK_SIZE+availableGap),
    w:BLOCK_SIZE,
    h:BLOCK_SIZE,
    value:value,
@@ -161,12 +170,25 @@ function makeColumn(x){
 
 function colorFor(v){
  const colors={
-  2:"#6ee7d8",4:"#6caeff",8:"#9b83ff",
-  16:"#c17aff",32:"#ff78b8",64:"#ff8b76",
-  128:"#ffbd65",256:"#e7dc67",512:"#a9dc72",
-  1024:"#61d6a1",2048:"#5ce0e8"
+  2:"#6ee7d8",
+  4:"#6caeff",
+  8:"#9b83ff",
+  16:"#c17aff",
+  32:"#ff78b8",
+  64:"#ff8b76",
+  128:"#ffbd65",
+  256:"#e7dc67",
+  512:"#a9dc72",
+  1024:"#61d6a1",
+  2048:"#5ce0e8"
  };
- return colors[v]||"#f5a5ff";
+
+ // 2048より大きい数字も、それぞれ違う色にする
+ if(colors[v])return colors[v];
+
+ const level=Math.round(Math.log2(v));
+ const hue=(level*47+25)%360;
+ return `hsl(${hue},85%,65%)`;
 }
 
 function burst(x,y,color,n=12){
