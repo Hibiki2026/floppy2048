@@ -18,14 +18,31 @@ header{width:min(100%,650px);display:flex;justify-content:space-between;align-it
 .stat b{font-size:16px}
 #gameWrap{position:relative;width:min(100%,650px);flex:1;min-height:0;max-height:850px;border:2px solid #333c64;border-radius:20px;overflow:hidden;background:#171d39}
 canvas{width:100%;height:100%;display:block}
-#overlay{position:absolute;inset:0;background:#101326d9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
-.panel{max-width:360px}
-.panel h1{font-size:38px;margin:0 0 8px}
-.panel p{color:#c2c9e8;line-height:1.7;font-size:14px}
-button{border:0;border-radius:14px;padding:14px 28px;background:linear-gradient(135deg,#8b83ff,#5b6cff);color:white;font-weight:900;font-size:17px;cursor:pointer}
-button:active{transform:scale(.96)}
+#overlay{position:absolute;inset:0;background:#101326eF;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;overflow-y:auto}
+.panel{width:100%;max-width:390px}
+.panel h1{font-size:34px;margin:0 0 8px}
+.panel p{color:#c2c9e8;line-height:1.6;font-size:13px}
+.levels{display:grid;gap:10px;margin-top:16px}
+.levelBtn{width:100%;padding:13px 12px;text-align:left;border:1px solid #555d91;background:linear-gradient(135deg,#30385f,#202744);border-radius:13px;color:white}
+.levelBtn b{display:block;font-size:18px;margin-bottom:3px}
+.levelBtn small{display:block;font-size:12px;color:#d0d5f0;font-weight:500;line-height:1.5}
+.levelBtn.easy{border-color:#63d9b5}
+.levelBtn.normal{border-color:#6caeff}
+.levelBtn.hard{border-color:#ffad65}
+.levelBtn.extreme{border-color:#ff668f;background:linear-gradient(135deg,#642c55,#30203f)}
+button:active{transform:scale(.97)}
+.subBtn{border:0;border-radius:12px;padding:12px 22px;background:linear-gradient(135deg,#8b83ff,#5b6cff);color:white;font-weight:900;font-size:16px;cursor:pointer;margin:5px}
 #hint{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#aeb7d8;font-size:12px;pointer-events:none}
 #mobileTip{width:min(100%,650px);text-align:center;color:#9da8ce;font-size:12px;padding:9px}
+@media(max-height:620px){
+ #app{padding:5px}
+ header{padding-bottom:5px}
+ .panel h1{font-size:27px}
+ .levels{gap:6px;margin-top:8px}
+ .levelBtn{padding:8px 10px}
+ .levelBtn b{font-size:16px}
+ .levelBtn small{font-size:11px}
+}
 </style>
 </head>
 <body>
@@ -42,13 +59,11 @@ button:active{transform:scale(.96)}
 
 <div id="gameWrap">
  <canvas id="game"></canvas>
+
  <div id="overlay">
-  <div class="panel">
-   <h1 id="overTitle">Floppy2048</h1>
-   <p id="overText">タップ・Enter・スペースキーで上昇！<br>同じ数字のブロックに当たると数字が2倍！<br>違う数字に当たるとゲームオーバー！<br>画面の上下は通り抜けられるよ！</p>
-   <button id="startBtn">ゲームスタート</button>
-  </div>
+  <div class="panel" id="panel"></div>
  </div>
+
  <div id="hint">タップ / ENTER / SPACE で上昇</div>
 </div>
 <div id="mobileTip">画面タップでも操作できるよ！</div>
@@ -59,12 +74,12 @@ const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 const wrap=document.getElementById("gameWrap");
 const overlay=document.getElementById("overlay");
+const panel=document.getElementById("panel");
 
 const scoreEl=document.getElementById("score");
 const numberEl=document.getElementById("number");
 const bestEl=document.getElementById("best");
 const playsEl=document.getElementById("plays");
-const startBtn=document.getElementById("startBtn");
 
 let W=600,H=700,dpr=1;
 let running=false;
@@ -75,11 +90,62 @@ let backgroundOffset=0;
 let lastTime=0;
 let nextColumnX=0;
 let flash=0;
+let selectedLevel="normal";
 
 // 79～81行目：指定された設定
 const BLOCK_SIZE=80;
 const BLOCK_GAP=35;
 const COLUMN_SPACING=400;
+
+// 難易度設定
+const LEVELS={
+ easy:{
+  name:"簡単",
+  minBlocks:1,
+  maxBlocks:4,
+  gap:65,
+  columnSpacing:460,
+  startSpeed:2.5,
+  maxSpeed:2.5,
+  acceleration:0,
+  extreme:false
+ },
+ normal:{
+  name:"普通",
+  minBlocks:2,
+  maxBlocks:5,
+  gap:35,
+  columnSpacing:COLUMN_SPACING,
+  startSpeed:3,
+  maxSpeed:6.5,
+  acceleration:0.0008,
+  extreme:false
+ },
+ hard:{
+  name:"難しい",
+  minBlocks:4,
+  maxBlocks:6,
+  gap:46,
+  columnSpacing:360,
+  startSpeed:4.7,
+  maxSpeed:6.5,
+  acceleration:0.001,
+  extreme:false
+ },
+ extreme:{
+  name:"ゲキムズ",
+  minBlocks:6,
+  maxBlocks:6,
+  gap:0,
+  columnSpacing:400,
+  startSpeed:6.5,
+  maxSpeed:6.5,
+  acceleration:0,
+  extreme:true
+ }
+};
+
+const config=()=>LEVELS[selectedLevel];
 
 best=Number(localStorage.getItem("floppy2048_best")||0);
 plays=Number(localStorage.getItem("floppy2048_plays")||0);
@@ -98,14 +164,54 @@ function resize(){
 new ResizeObserver(resize).observe(wrap);
 resize();
 
+function showMenu(){
+ running=false;
+ overlay.style.display="flex";
+ panel.innerHTML=`
+  <h1>FLOPPY<span style="color:#8b83ff">2048</span></h1>
+  <p>プレイする難易度を選んでね！</p>
+  <div class="levels">
+   <button class="levelBtn easy" data-level="easy">
+    <b>🟢 簡単</b>
+    <small>今くらいのブロック数。間隔を広げてゆっくり。加速なし。</small>
+   </button>
+   <button class="levelBtn normal" data-level="normal">
+    <b>🔵 普通</b>
+    <small>ブロックを少し増量。間隔は今までどおり。だんだん加速！</small>
+   </button>
+   <button class="levelBtn hard" data-level="hard">
+    <b>🟠 難しい</b>
+    <small>隙間はギリギリ。速めにスタートして最高速度まで加速！</small>
+   </button>
+   <button class="levelBtn extreme" data-level="extreme">
+    <b>💀 ゲキムズ</b>
+    <small>隙間なし！最上段と最下段だけが正解。最初から最高速度！</small>
+   </button>
+  </div>
+ `;
+ panel.querySelectorAll("[data-level]").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+   selectedLevel=btn.dataset.level;
+   start();
+  });
+ });
+}
+
 function reset(){
  score=0;
- speed=3;
  frame=0;
  backgroundOffset=0;
  flash=0;
+ speed=config().startSpeed;
 
- player={x:W*.22,y:H*.5,vy:0,value:2,r:22};
+ player={
+  x:W*.22,
+  y:H*.5,
+  vy:0,
+  value:2,
+  r:22
+ };
+
  blocks=[];
  particles=[];
  scoreEl.textContent=0;
@@ -114,36 +220,60 @@ function reset(){
  nextColumnX=W+100;
  for(let i=0;i<7;i++){
   makeColumn(nextColumnX);
-  nextColumnX+=COLUMN_SPACING;
+  nextColumnX+=config().columnSpacing;
  }
 }
 
 function makeColumn(x){
- // 最大5個のブロックを配置。6個目のスペースも確保する
-const amount=1+Math.floor(Math.random()*4);
+ const cfg=config();
 
- // 6個分の配置スペースを計算
+ // 画面に6段分のスペースを確保
  const slotCount=6;
  const availableGap=Math.min(
-  BLOCK_GAP,
-  Math.max(4,(H-16-slotCount*BLOCK_SIZE)/(slotCount-1))
+  cfg.gap,
+  Math.max(0,(H-16-slotCount*BLOCK_SIZE)/(slotCount-1))
  );
  const total=slotCount*BLOCK_SIZE+(slotCount-1)*availableGap;
  const top=Math.max(8,(H-total)/2);
 
- // 使う位置をランダムに選ぶ（6段目は空けておく）
- const positions=[0,1,2,3,4];
- for(let i=positions.length-1;i>0;i--){
-  const j=Math.floor(Math.random()*(i+1));
-  [positions[i],positions[j]]=[positions[j],positions[i]];
- }
- const selected=positions.slice(0,amount).sort((a,b)=>a-b);
- const matchIndex=Math.floor(Math.random()*amount);
+ let selected=[];
 
- for(let i=0;i<amount;i++){
+ if(cfg.extreme){
+  // ゲキムズは6段全部を隙間なく配置
+  selected=[0,1,2,3,4,5];
+ }else{
+  const amount=cfg.minBlocks+
+   Math.floor(Math.random()*(cfg.maxBlocks-cfg.minBlocks+1));
+
+  const positions=[0,1,2,3,4,5];
+
+  for(let i=positions.length-1;i>0;i--){
+   const j=Math.floor(Math.random()*(i+1));
+   [positions[i],positions[j]]=[positions[j],positions[i]];
+  }
+
+  selected=positions.slice(0,amount).sort((a,b)=>a-b);
+ }
+
+ const matchIndex=cfg.extreme?-1:Math.floor(Math.random()*selected.length);
+
+ for(let i=0;i<selected.length;i++){
   let value;
 
-  if(i===matchIndex){
+  if(cfg.extreme){
+   // 一番上と一番下だけが正解
+   if(selected[i]===0||selected[i]===5){
+    value=player.value;
+   }else{
+    const choices=[
+     player.value*2,
+     player.value*4,
+     player.value*8,
+     player.value*16
+    ];
+    value=choices[Math.floor(Math.random()*choices.length)];
+   }
+  }else if(i===matchIndex){
    value=player.value;
   }else{
    const choices=[
@@ -183,7 +313,6 @@ function colorFor(v){
   2048:"#5ce0e8"
  };
 
- // 2048より大きい数字も、それぞれ違う色にする
  if(colors[v])return colors[v];
 
  const level=Math.round(Math.log2(v));
@@ -232,16 +361,22 @@ function gameOver(){
   bestEl.textContent=best;
  }
 
- document.getElementById("overTitle").textContent="GAME OVER";
- document.getElementById("overText").innerHTML=
-  "スコア："+score+
-  "<br>到達した数字："+player.value+
-  "<br>自己ベスト："+best+
-  "<br>総プレイ回数："+plays+
-  "<br><br>もう一度挑戦しよう！";
-
- startBtn.textContent="もう一度プレイ";
  overlay.style.display="flex";
+ panel.innerHTML=`
+  <h1>GAME OVER</h1>
+  <p>
+   難易度：${config().name}<br>
+   スコア：${score}<br>
+   到達した数字：${player.value}<br>
+   自己ベスト：${best}<br>
+   総プレイ回数：${plays}
+  </p>
+  <button class="subBtn" id="retryBtn">もう一度プレイ</button>
+  <button class="subBtn" id="menuBtn">レベル選択に戻る</button>
+ `;
+
+ document.getElementById("retryBtn").addEventListener("click",start);
+ document.getElementById("menuBtn").addEventListener("click",showMenu);
 }
 
 function rounded(x,y,w,h,r){
@@ -263,6 +398,7 @@ function drawBackground(dt){
   ctx.lineTo(x,H);
   ctx.stroke();
  }
+
  for(let y=0;y<H;y+=55){
   ctx.beginPath();
   ctx.moveTo(0,y);
@@ -314,8 +450,19 @@ function drawPlayer(){
 }
 
 function update(dt){
+ const cfg=config();
+
  frame+=dt;
- speed=Math.min(6.5,3+frame*0.0008+score*0.008);
+
+ // 難易度ごとの速度
+ if(cfg.acceleration>0){
+  speed=Math.min(
+   cfg.maxSpeed,
+   cfg.startSpeed+frame*cfg.acceleration+score*.008
+  );
+ }else{
+  speed=cfg.startSpeed;
+ }
 
  player.vy+=.27*dt;
  player.y+=player.vy*dt;
@@ -357,11 +504,12 @@ function update(dt){
 
  blocks=blocks.filter(b=>b.x+b.w>-150);
 
- // 次の列を常に右側へ追加
+ // 次の列を追加
  nextColumnX-=speed*dt;
+
  while(nextColumnX<W+200){
   makeColumn(nextColumnX);
-  nextColumnX+=COLUMN_SPACING;
+  nextColumnX+=cfg.columnSpacing;
  }
 
  for(const p of particles){
@@ -370,12 +518,17 @@ function update(dt){
   p.vy+=.08*dt;
   p.life-=dt;
  }
+
  particles=particles.filter(p=>p.life>0);
 }
 
 function draw(){
  drawBackground(1);
- for(const b of blocks)if(!b.done)drawBlock(b);
+
+ for(const b of blocks){
+  if(!b.done)drawBlock(b);
+ }
+
  drawPlayer();
 
  for(const p of particles){
@@ -385,6 +538,7 @@ function draw(){
   ctx.arc(p.x,p.y,3,0,Math.PI*2);
   ctx.fill();
  }
+
  ctx.globalAlpha=1;
 
  if(flash>0){
@@ -395,10 +549,13 @@ function draw(){
 
 function loop(now){
  if(!running)return;
+
  const dt=Math.min(2,(now-lastTime)/16.67);
  lastTime=now;
+
  update(dt);
  draw();
+
  if(running)requestAnimationFrame(loop);
 }
 
@@ -409,17 +566,15 @@ canvas.addEventListener("pointerdown",e=>{
 
 document.addEventListener("keydown",e=>{
  if(e.code==="Enter"||e.code==="Space"||e.code==="ArrowUp"){
-  e.preventDefault();
-  if(!running){
-   start();
-   return;
+  if(running){
+   e.preventDefault();
+   flap();
   }
-  flap();
  }
 });
 
-startBtn.addEventListener("click",start);
 drawBackground(0);
+showMenu();
 </script>
 </body>
 </html>
